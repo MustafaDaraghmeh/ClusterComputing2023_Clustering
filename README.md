@@ -1,5 +1,5 @@
 # An Ensemble Clustering Approach for Modeling Hidden Categorization Perspectives for Cloud Workloads
-Cluster Computing, The Journal of Networks, Software Tools and Applications
+Cluster Computing, the Journal of Networks, Software Tools and Applications.
 
 ## Abstract
 Effectively managing cloud resources is a complex task due to the interdependencies of various cloud-hosted services and applications. 
