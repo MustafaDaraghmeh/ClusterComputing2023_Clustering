@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\caption{Comparison result of baseline clustering algorithms with respect to the transformed original data using the standard pipeline}
+\label{tbl:Baseline_res}
+\begin{tabular}{lrrrr}
+\toprule
+        Model &  Clusters &      SC &        CHI &     DBI \\
+\midrule
+       KMeans &         4 &  0.7117 & 99388.6100 &  0.4755 \\
+    MeanShift &         4 &  0.7117 & 99382.9519 &  0.4756 \\
+Agglomerative &         4 &  0.7101 & 98356.3247 &  0.4758 \\
+       OPTICS &       518 & -0.5198 &     8.3679 &  1.4880 \\
+        Birch &         4 &  0.7101 & 98356.3247 &  0.4758 \\
+       KModes &         4 & -0.0247 & 10026.6048 & 12.8001 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -4,10 +4,12 @@ from typing import Any
 import pandas as pd
 import numpy as np
 import mlflow
+from yellowbrick.cluster import KElbowVisualizer, SilhouetteVisualizer, InterclusterDistance
+
 import seaborn as sns
 from pycaret.clustering import ClusteringExperiment
 # Set up the default plotting settings
-sns.set_theme(context="paper", style='whitegrid',  palette='deep', font='serif', font_scale=1.5, rc={"figure.dpi": 300})
+sns.set_theme(context="paper", style='whitegrid',  palette='deep', font='serif', font_scale=1.7, rc={"figure.dpi": 300})
 
 mlflow.set_tracking_uri('sqlite:///./mlruns.db')
 # mlflow.log_dict(_config, mlflow.get_artifact_uri())
@@ -102,7 +104,7 @@ def load_trace_data(n=None, session_id=session_id):
 
     # ---- load the original data
     print("load the original data")
-    data_path = f'C:/__datasets__/azure_2019/vmtable.csv.gz'
+    data_path = f'/nfs/speed-scratch/m_daragh/datasets/azure2019/original/vmtable.csv.gz'
     headers = ['VM ID', 'Subscription ID', 'Deployment ID', 'Created', 'Deleted', 'MAX CPU', 'AVG CPU',
                '95th Percentile(MAX CPU)', 'VM Type', 'Core Bucket', 'Memory Bucket']
     trace_dataframe = pd.read_csv(data_path, header=None, index_col=False, names=headers, delimiter=',')
@@ -190,7 +192,7 @@ def get_best_n_clusters_via_KneeLocator_of_distortion_score(model, X, min_cluste
         distortion = distortion_score(X, model.labels_)  # Sum of squared distances to closest centroid
         distortions.append(distortion)
 
-    # to select the pca_components
+    # to select the cluster no.
     from yellowbrick.utils import KneeLocator
 
     kneedle = KneeLocator(k_values_, distortions, curve_nature="convex", curve_direction="decreasing")
@@ -711,19 +713,22 @@ def calculate_combine_score_and_select_models_based_on_median(scores_df, weight_
     :return:
     '''
     # Define the weights for each metric (you can adjust the weights based on your preference)
-
+    from pickle import dump
     # Normalize the scores to a common range form 0 to 1 using min-max scaler
     from sklearn.preprocessing import MinMaxScaler
     silhouette_scaler = MinMaxScaler(feature_range=(0, 1))
     scores_df['normalized_SC'] = silhouette_scaler.fit_transform(scores_df[['SC']])
     # scores_df['normalized2_SC'] = (scores_df[['SC']] + 1) / 2 # considering the original range
+    dump(silhouette_scaler, open('./scores/silhouette_scaler.pkl', 'wb'))
 
     calinski_harabasz_scaler = MinMaxScaler(feature_range=(0, 1))
     scores_df['normalized_CHI'] = calinski_harabasz_scaler.fit_transform(scores_df[['CHI']])
+    dump(calinski_harabasz_scaler, open('./scores/calinski_harabasz_scaler.pkl', 'wb'))
 
     davies_bouldin_scaler = MinMaxScaler(feature_range=(0, 1))
     # 1 - normalized DBI to change the optimal values from lower to higher
     scores_df['normalized_DBI'] = 1 - davies_bouldin_scaler.fit_transform(scores_df[['DBI']])
+    dump(davies_bouldin_scaler, open('./scores/davies_bouldin_scaler.pkl', 'wb'))
 
     # Combine the scores using weighted average
     scores_df['combined_score'] = (weight_silhouette * scores_df['normalized_SC'] +
@@ -879,19 +884,61 @@ def ensemble_clustering(Cluster_labels, meta_clustering_model_index, pca,  setup
     meta_clustering_model_name ="-"
     if meta_clustering_model_index == 'meanshift':
         meta_clustering_model_name = 'MeanShift'
+        from sklearn.cluster import MeanShift
+        title = f"Model = ({meta_clustering_model_name}),     PCA = ({pca})"
+        # Instantiate the clustering model and InterclusterDistance
+        visualizer = InterclusterDistance(MeanShift(n_jobs=-1), legend=False, random_state=session_id,
+                                          title=title)
+        visualizer.fit(EP.X_train_transformed)  # Fit the data to the visualizer
+        visualizer.show(outpath=f'out_figs/InterclusterDistance_{meta_clustering_model_index}_{pca}.png',
+                        clear_figure=True)  # Finalize and render the figure
+
     if meta_clustering_model_index in ['kmeans', 'hclust', 'sc', 'birch', 'kmodes']:
         from sklearn.cluster import AgglomerativeClustering, KMeans, SpectralClustering, Birch
         from kmodes.kmodes import KModes
         if meta_clustering_model_index == 'kmeans':
             meta_clustering_model_name = 'KMeans'
-            num_clusters = get_best_n_clusters_via_KneeLocator_of_distortion_score(
-                KMeans(random_state=session_id), EP.X_train_transformed)
+            # num_clusters = get_best_n_clusters_via_KneeLocator_of_distortion_score(
+            # KMeans(random_state=session_id), EP.X_train_transformed)
+
+            title = f"Model = ({meta_clustering_model_name}),     PCA = ({pca})"
+            visualizer = KElbowVisualizer(KMeans(random_state=session_id), k=(2, 10), timings=False, metric="distortion",
+                                          title=title)
+            visualizer.fit(EP.X_train_transformed)  # Fit the data to the visualizer
+            # print("num_clusters", num_clusters)
+            # print(visualizer.k, "visualizer.k_scores_", visualizer.knee_value)
+            visualizer.show(outpath=f'out_figs/KElbow_{meta_clustering_model_index}_{pca}.png',
+                            clear_figure=True)  # Finalize and render the figure
+            num_clusters = visualizer.elbow_value_
             meta_model_kwargs['num_clusters'] = num_clusters
+
+            # Instantiate the clustering model and InterclusterDistance
+            visualizer = InterclusterDistance(KMeans(random_state=session_id, n_clusters=num_clusters), legend=False, random_state=session_id,
+                                              title=title)
+            visualizer.fit(EP.X_train_transformed)  # Fit the data to the visualizer
+            visualizer.show(outpath=f'out_figs/InterclusterDistance_{meta_clustering_model_index}_{pca}.png',
+                            clear_figure=True)  # Finalize and render the figure
+
+            # Instantiate the clustering model and visualizer
+            visualizer = SilhouetteVisualizer(KMeans(random_state=session_id, n_clusters=num_clusters), colors='yellowbrick', title=title)
+            visualizer.fit(EP.X_train_transformed)  # Fit the data to the visualizer
+            visualizer.show(outpath=f'out_figs/Silhouette_{meta_clustering_model_index}_{pca}.png', clear_figure=True)
 
         if meta_clustering_model_index == 'hclust':
             meta_clustering_model_name = 'Agglomerative'
-            num_clusters = get_best_n_clusters_via_KneeLocator_of_distortion_score(
-                AgglomerativeClustering(linkage='ward', affinity='euclidean'), EP.X_train_transformed)
+            # num_clusters = get_best_n_clusters_via_KneeLocator_of_distortion_score(
+            #     AgglomerativeClustering(linkage='ward', affinity='euclidean'), EP.X_train_transformed)
+
+            title = f"Model = ({meta_clustering_model_name}),     PCA = ({pca})"
+            visualizer = KElbowVisualizer(AgglomerativeClustering(linkage='ward', affinity='euclidean'), k=(2, 10), timings=False, metric="distortion",
+                                          title=title)
+            visualizer.fit(EP.X_train_transformed)  # Fit the data to the visualizer
+            # print("num_clusters", num_clusters)
+            # print(visualizer.k, "visualizer.k_scores_", visualizer.knee_value)
+            visualizer.show(outpath=f'out_figs/KElbow_{meta_clustering_model_index}_{pca}.png',
+                            clear_figure=True)  # Finalize and render the figure
+            num_clusters = visualizer.elbow_value_
+
             meta_model_kwargs['num_clusters'] = num_clusters
 
         if meta_clustering_model_index == 'sc':
@@ -1009,13 +1056,15 @@ def main():
     # and the function determines the optimal number of clusters for each clustering model for every configuration.
     #     In summary, this function is used in the compare_normalization_and_transformation_setups function to dynamically
     #     determine the optimal number of clusters for each configuration of normalization and transformation methods being compared.
-    norm_tran_res = compare_normalization_and_transformation_setups(normalization_and_transformation_setups,
-                                                                    trace_dataframe,
-                                                                    schema['index'],
-                                                                    schema['categorical_features'],
-                                                                    schema['ordinal_features'],
-                                                                    schema['numeric_features'],
-                                                                    schema['datetime_index_columns'])
+
+    # IMPORTANT: Uncomment the follow in the final run
+    # norm_tran_res = compare_normalization_and_transformation_setups(normalization_and_transformation_setups,
+    #                                                                 trace_dataframe,
+    #                                                                 schema['index'],
+    #                                                                 schema['categorical_features'],
+    #                                                                 schema['ordinal_features'],
+    #                                                                 schema['numeric_features'],
+    #                                                                 schema['datetime_index_columns'])
 
     # The function compare_normalization_transformation_pca_setups is similar to the compare_normalization_and_transformation_setups
     # function but with an additional parameter to evaluate:
@@ -1076,11 +1125,7 @@ def main():
                                                                                  max_encoding_ohe=1,
                                                                                  experiment_name=f"Ensemble Clustering",
                                                                                  log_experiment=True,
-                                                                                 log_plots=['pipeline', 'cluster',
-                                                                                            'tsne',
-                                                                                            'elbow', 'silhouette',
-                                                                                            'distance',
-                                                                                            'distribution'],
+                                                                                 # log_plots=['elbow', 'silhouette','distance'],
                                                                                  html=False,
                                                                                  memory='./caching_directory'),
                                                                              meta_model_kwargs={},
@@ -1107,6 +1152,36 @@ def main():
                      caption=f'Comparison result of ensemble clustering in the respect of the base clustering outcomes',
                      label=f'tbl:meta_clustering_score_results', position='t',
                      index=False, escape=False)
+
+    # ----------------------------------
+    res_df_normalized = res_df_.copy()
+    import joblib
+    silhouette_scaler = joblib.load('./scores/silhouette_scaler.pkl')
+    calinski_harabasz_scaler = joblib.load('./scores/calinski_harabasz_scaler.pkl')
+    davies_bouldin_scaler = joblib.load('./scores/davies_bouldin_scaler.pkl')
+
+    res_df_normalized['normalized_SC'] = silhouette_scaler.transform(res_df_normalized[['SC']])
+    res_df_normalized['normalized_CHI'] = calinski_harabasz_scaler.transform(res_df_normalized[['CHI']])
+    res_df_normalized['normalized_DBI'] = 1 - davies_bouldin_scaler.transform(res_df_normalized[['DBI']])
+
+    weight_silhouette = 0.34
+    weight_calinski_harabasz = 0.33
+    weight_davies_bouldin = 0.33
+
+    # Combine the scores using weighted average
+    res_df_normalized['combined_score'] = (weight_silhouette * res_df_normalized['normalized_SC'] +
+                                   weight_calinski_harabasz * res_df_normalized['normalized_CHI'] +
+                                   weight_davies_bouldin * res_df_normalized['normalized_DBI'])
+
+    res_df_normalized['normalized_SC'] = res_df_normalized['normalized_SC'].mul(100).round(2).astype(str).add(' \%')
+    res_df_normalized['normalized_CHI'] = res_df_normalized['normalized_CHI'].mul(100).round(2).astype(str).add(' \%')
+    res_df_normalized['normalized_DBI'] = res_df_normalized['normalized_DBI'].mul(100).round(2).astype(str).add(' \%')
+    res_df_normalized['combined_score'] = res_df_normalized['combined_score'].mul(100).round(2).astype(str).add(' \%')
+
+    res_df_normalized.to_latex(buf=f'out_tbl/meta_clustering_score_results_normalized.tex',
+                     caption=f'Comparison result of ensemble clustering in the respect of the base clustering outcomes (Normalized)',
+                     label=f'tbl:meta_clustering_score_results_normalized', position='t',
+                     index=False, escape=False)
     # -----------------------------------
 
     # Final evaluation
@@ -1123,6 +1198,12 @@ def main():
 
              date_features=schema['datetime_index_columns'],
              create_date_columns=['weekday', 'day', 'hour', 'minute'],
+
+             # Remove zero variance and perfect remove col-linearity
+             low_variance_threshold=0,  # keep all features with non-zero variance,
+             remove_multicollinearity=True,
+             # Minimum absolute Pearson correlation to identify correlated features. The default value removes equal columns.
+             multicollinearity_threshold=0.99,
 
              transformation=False,
 
@@ -1164,6 +1245,146 @@ def main():
                      index=False, escape=False)
 
     print(res_df_ens)
+
+    # ----------------------------------
+    res_df_ens_normalized = res_df_ens.copy()
+    import joblib
+    silhouette_scaler = joblib.load('./scores/silhouette_scaler.pkl')
+    calinski_harabasz_scaler = joblib.load('./scores/calinski_harabasz_scaler.pkl')
+    davies_bouldin_scaler = joblib.load('./scores/davies_bouldin_scaler.pkl')
+
+    res_df_ens_normalized['normalized_SC'] = silhouette_scaler.transform(res_df_ens_normalized[['SC']])
+    res_df_ens_normalized['normalized_CHI'] = calinski_harabasz_scaler.transform(res_df_ens_normalized[['CHI']])
+    res_df_ens_normalized['normalized_DBI'] = 1 - davies_bouldin_scaler.transform(res_df_ens_normalized[['DBI']])
+
+    weight_silhouette = 0.34
+    weight_calinski_harabasz = 0.33
+    weight_davies_bouldin = 0.33
+
+    # Combine the scores using weighted average
+    res_df_ens_normalized['combined_score'] = (weight_silhouette * res_df_ens_normalized['normalized_SC'] +
+                                   weight_calinski_harabasz * res_df_ens_normalized['normalized_CHI'] +
+                                   weight_davies_bouldin * res_df_ens_normalized['normalized_DBI'])
+
+    res_df_ens_normalized['normalized_SC'] = res_df_ens_normalized['normalized_SC'].mul(100).round(2).astype(str).add(' \%')
+    res_df_ens_normalized['normalized_CHI'] = res_df_ens_normalized['normalized_CHI'].mul(100).round(2).astype(str).add(' \%')
+    res_df_ens_normalized['normalized_DBI'] = res_df_ens_normalized['normalized_DBI'].mul(100).round(2).astype(str).add(' \%')
+    res_df_ens_normalized['combined_score'] = res_df_ens_normalized['combined_score'].mul(100).round(2).astype(str).add(' \%')
+
+    res_df_ens_normalized.to_latex(buf=f'out_tbl/meta_clustering_score_results_respect_original_normalized.tex',
+                     caption=f'Comparison result of ensemble clustering in the respect of the original data (Normalized)',
+                     label=f'tbl:meta_clustering_score_results_respect_original_normalized', position='t',
+                     index=False, escape=False)
+    # -----------------------------------
+
+    SP = ClusteringExperiment()
+    SP.setup(data=trace_dataframe, index=schema['index'],
+             categorical_features=schema['categorical_features'],
+             encoding_method=CountEncoder(), max_encoding_ohe=3,
+             ordinal_features=schema['ordinal_features'],
+             numeric_features=schema['numeric_features'],
+
+             date_features=schema['datetime_index_columns'],
+             create_date_columns=['weekday', 'day', 'hour', 'minute'],
+
+             # Remove zero variance and perfect remove col-linearity
+             low_variance_threshold=0,  # keep all features with non-zero variance,
+             remove_multicollinearity=True,
+             # Minimum absolute Pearson correlation to identify correlated features. The default value removes equal columns.
+             multicollinearity_threshold=0.99,
+
+             transformation=False,
+
+             normalize=False,
+             # pca=True,
+             # pca_components=1,
+
+             session_id=session_id,
+             experiment_name=f"SP - Baseline",
+             log_experiment=True,
+             log_plots=False,
+             html=False,
+             memory='./caching_directory'
+             )
+    SP.remove_metric('hs')
+    SP.remove_metric('ari')
+    SP.remove_metric('cs')
+    
+    Baseline_res = []
+    
+    clustering_model_index = 'kmeans'
+    clustering_model_name = 'KMeans'
+    baseline_kmeans = SP.create_model(clustering_model_index)
+    res = dict(clustering_model_index=clustering_model_index,
+               clustering_model_name=clustering_model_name,
+               num_clusters=np.unique(baseline_kmeans.labels_).size,
+               SC=SP.pull()['Silhouette'][0],
+               CHI=SP.pull()['Calinski-Harabasz'][0],
+               DBI=SP.pull()['Davies-Bouldin'][0])
+    Baseline_res.append(res)
+
+    clustering_model_index = 'meanshift'
+    clustering_model_name = 'MeanShift'
+    baseline_meanshift = SP.create_model(clustering_model_index)
+    res = dict(clustering_model_index=clustering_model_index,
+               clustering_model_name=clustering_model_name,
+               num_clusters=np.unique(baseline_meanshift.labels_).size,
+               SC=SP.pull()['Silhouette'][0],
+               CHI=SP.pull()['Calinski-Harabasz'][0],
+               DBI=SP.pull()['Davies-Bouldin'][0])
+    Baseline_res.append(res)
+
+    clustering_model_index = 'hclust'
+    clustering_model_name = 'Agglomerative'
+    baseline_hclust = SP.create_model(clustering_model_index)
+    res = dict(clustering_model_index=clustering_model_index,
+               clustering_model_name=clustering_model_name,
+               num_clusters=np.unique(baseline_hclust.labels_).size,
+               SC=SP.pull()['Silhouette'][0],
+               CHI=SP.pull()['Calinski-Harabasz'][0],
+               DBI=SP.pull()['Davies-Bouldin'][0])
+    Baseline_res.append(res)
+
+    clustering_model_index = 'optics'
+    clustering_model_name = 'OPTICS'
+    baseline_optics = SP.create_model(clustering_model_index)
+    res = dict(clustering_model_index=clustering_model_index,
+               clustering_model_name=clustering_model_name,
+               num_clusters=np.unique(baseline_optics.labels_).size,
+               SC=SP.pull()['Silhouette'][0],
+               CHI=SP.pull()['Calinski-Harabasz'][0],
+               DBI=SP.pull()['Davies-Bouldin'][0])
+    Baseline_res.append(res)
+
+    clustering_model_index = 'birch'
+    clustering_model_name = 'Birch'
+    baseline_birch = SP.create_model(clustering_model_index)
+    res = dict(clustering_model_index=clustering_model_index,
+               clustering_model_name=clustering_model_name,
+               num_clusters=np.unique(baseline_birch.labels_).size,
+               SC=SP.pull()['Silhouette'][0],
+               CHI=SP.pull()['Calinski-Harabasz'][0],
+               DBI=SP.pull()['Davies-Bouldin'][0])
+    Baseline_res.append(res)
+
+    clustering_model_index = 'kmodes'
+    clustering_model_name = 'KModes'
+    baseline_kmodes = SP.create_model(clustering_model_index)
+    res = dict(clustering_model_index=clustering_model_index,
+               clustering_model_name=clustering_model_name,
+               num_clusters=np.unique(baseline_kmodes.labels_).size,
+               SC=SP.pull()['Silhouette'][0],
+               CHI=SP.pull()['Calinski-Harabasz'][0],
+               DBI=SP.pull()['Davies-Bouldin'][0])
+    Baseline_res.append(res)
+
+    Baseline_res_df =pd.DataFrame(Baseline_res)
+    Baseline_res_df.columns = ['index','Model', 'Clusters', 'SC', 'CHI', 'DBI']
+    Baseline_res_df.drop('index', axis=1, inplace=True)
+    Baseline_res_df.to_latex(buf=f'out_tbl/Baseline_res.tex',
+                                   caption=f'Comparison result of baseline clustering algorithms with respect to the transformed original data using the standard pipeline',
+                                   label=f'tbl:Baseline_res', position='t',
+                                   index=False, escape=False)
 
     print("Done")
 

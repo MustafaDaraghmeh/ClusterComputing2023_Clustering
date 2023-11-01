@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\caption{Comparison result of ensemble clustering in the respect of the base clustering outcomes (Normalized)}
+\label{tbl:meta_clustering_score_results_normalized}
+\begin{tabular}{lrlrrrllll}
+\toprule
+   Meta Model &  Clusters &   PCA &     SC &        CHI &    DBI & normalized_SC & normalized_CHI & normalized_DBI & combined_score \\
+\midrule
+       KMeans &         4 & False & 0.7297 & 25159.6013 & 0.8914 &      96.79 \% &       19.35 \% &       47.64 \% &       55.01 \% \\
+       KMeans &         4 &  True & 0.7371 & 27000.0676 & 0.8669 &      97.77 \% &       20.77 \% &       49.07 \% &       56.29 \% \\
+Agglomerative &         4 & False & 0.7223 & 23192.8589 & 0.8567 &      95.81 \% &       17.84 \% &       49.67 \% &       54.85 \% \\
+Agglomerative &         4 &  True & 0.7171 & 23115.8426 & 0.7872 &      95.12 \% &       17.78 \% &       53.76 \% &       55.95 \% \\
+    MeanShift &        64 & False & 0.9254 & 44697.3547 & 0.1536 &     122.75 \% &       34.38 \% &       90.98 \% &        83.1 \% \\
+    MeanShift &        44 &  True & 0.9283 & 61871.5461 & 0.3304 &     123.13 \% &       47.58 \% &       80.59 \% &       84.16 \% \\
+\bottomrule
+\end{tabular}
+\end{table}

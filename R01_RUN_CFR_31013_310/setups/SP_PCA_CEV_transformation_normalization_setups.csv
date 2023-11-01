@@ -1,0 +1,16 @@
+Data Pipeline,Transformation,Normalization,PCA Components,CEV
+$P_{1}$,,,3,0.99
+$P_{2}$,,zscore,8,0.84
+$P_{3}$,,minmax,8,0.89
+$P_{4}$,,maxabs,8,0.89
+$P_{5}$,,robust,6,0.86
+$P_{6}$,yeo-johnson,,4,1.0
+$P_{7}$,yeo-johnson,zscore,8,0.89
+$P_{8}$,yeo-johnson,minmax,8,0.91
+$P_{9}$,yeo-johnson,maxabs,8,0.91
+$P_{10}$,yeo-johnson,robust,8,0.9
+$P_{11}$,quantile,,7,0.92
+$P_{12}$,quantile,zscore,8,0.87
+$P_{13}$,quantile,minmax,7,0.92
+$P_{14}$,quantile,maxabs,7,0.92
+$P_{15}$,quantile,robust,6,0.9

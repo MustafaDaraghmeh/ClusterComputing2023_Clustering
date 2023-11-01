@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\caption{Comparison result of ensemble clustering in the respect of the original data }
+\label{tbl:meta_clustering_score_results_respect_original}
+\begin{tabular}{llrrr}
+\toprule
+Meta Model &   PCA &       SC &           CHI &        DBI \\
+\midrule
+    kmeans & False & 0.760512 & 102978.250519 &   4.480523 \\
+    kmeans &  True & 0.760512 & 102978.250519 &   4.480523 \\
+    hclust & False & 0.776163 & 148892.254116 &  12.752206 \\
+    hclust &  True & 0.787690 & 188882.500909 &   2.850775 \\
+ meanshift & False & 0.079249 &  22850.458367 &  96.644663 \\
+ meanshift &  True & 0.237065 &  29348.118081 & 217.714350 \\
+\bottomrule
+\end{tabular}
+\end{table}

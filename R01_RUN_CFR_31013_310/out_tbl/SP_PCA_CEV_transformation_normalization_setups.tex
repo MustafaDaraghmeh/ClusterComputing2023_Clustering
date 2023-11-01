@@ -1,0 +1,26 @@
+\begin{table}[t]
+\centering
+\caption{PCA components and CEV for various combinations of transformation and normalization methods}
+\label{tbl:SP_PCA_CEV_norm_tran_setups}
+\begin{tabular}{lllrr}
+\toprule
+Data Pipeline & Transformation & Normalization &  PCA Components &  CEV \\
+\midrule
+      $P_{1}$ &           None &          None &               3 & 0.99 \\
+      $P_{2}$ &           None &        zscore &               8 & 0.84 \\
+      $P_{3}$ &           None &        minmax &               8 & 0.89 \\
+      $P_{4}$ &           None &        maxabs &               8 & 0.89 \\
+      $P_{5}$ &           None &        robust &               6 & 0.86 \\
+      $P_{6}$ &    yeo-johnson &          None &               4 & 1.00 \\
+      $P_{7}$ &    yeo-johnson &        zscore &               8 & 0.89 \\
+      $P_{8}$ &    yeo-johnson &        minmax &               8 & 0.91 \\
+      $P_{9}$ &    yeo-johnson &        maxabs &               8 & 0.91 \\
+     $P_{10}$ &    yeo-johnson &        robust &               8 & 0.90 \\
+     $P_{11}$ &       quantile &          None &               7 & 0.92 \\
+     $P_{12}$ &       quantile &        zscore &               8 & 0.87 \\
+     $P_{13}$ &       quantile &        minmax &               7 & 0.92 \\
+     $P_{14}$ &       quantile &        maxabs &               7 & 0.92 \\
+     $P_{15}$ &       quantile &        robust &               6 & 0.90 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\caption{Comparison result of ensemble clustering in the respect of the base clustering outcomes}
+\label{tbl:meta_clustering_score_results}
+\begin{tabular}{lrlrrr}
+\toprule
+   Meta Model &  Clusters &   PCA &     SC &        CHI &    DBI \\
+\midrule
+       KMeans &         4 & False & 0.7297 & 25159.6013 & 0.8914 \\
+       KMeans &         4 &  True & 0.7371 & 27000.0676 & 0.8669 \\
+Agglomerative &         4 & False & 0.7223 & 23192.8589 & 0.8567 \\
+Agglomerative &         4 &  True & 0.7171 & 23115.8426 & 0.7872 \\
+    MeanShift &        64 & False & 0.9254 & 44697.3547 & 0.1536 \\
+    MeanShift &        44 &  True & 0.9283 & 61871.5461 & 0.3304 \\
+\bottomrule
+\end{tabular}
+\end{table}
